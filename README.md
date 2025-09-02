@@ -1,6 +1,6 @@
-# 💬 Chatbot template
+# 💬 Sutherland Chatbot 
 
-A simple Streamlit app that shows how to build a chatbot using Mistral's API key
+A simple Streamlit app that shows a chatbot personlaised for Sutherland using Mistral's API key
 
 
 ### How to run it on your own machine
