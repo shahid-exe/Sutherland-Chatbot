@@ -2,7 +2,6 @@
 
 A simple Streamlit app that shows how to build a chatbot using Mistral's API key
 
-[![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://chatbot-template.streamlit.app/)
 
 ### How to run it on your own machine
 
