@@ -1,25 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-Sutherland RAG Chatbot (Web Scraper + FAISS + LangChain + Mistral "Grok"-labeled UI)
--------------------------------------------------------------------------------
-Refined single-file implementation that:
-- Cleans up imports and comments (no Google GenAI bits left)
-- Keeps existing functionality and model usage (LangChain + ChatMistralAI)
-- Adds a polished Streamlit UI while preserving the original CLI chat helper
-- Includes safe, idempotent package installation utilities (optional)
-
-Run options:
-1) Streamlit UI (recommended):
-   streamlit run sutherland_rag_streamlit.py
-
-2) CLI demo (fallback):
-   python sutherland_rag_streamlit.py --cli
-
-Notes:
-- Web scraping is limited to Sutherland official pages listed below.
-- The LLM is instantiated via `langchain_mistralai.ChatMistralAI` and labeled as
-  "Grok" in copy per user request. Replace with your preferred model if needed.
-"""
 
 from __future__ import annotations
 import os
@@ -29,9 +7,6 @@ import warnings
 import argparse
 from typing import List, Optional, Dict, Any
 
-# ------------------------------ Optional: auto-install ------------------------------
-# These helpers make the file robust in fresh environments (Colab, VM, etc.).
-# If you prefer managing dependencies yourself, you can remove this block safely.
 
 def _ensure_packages():
     import importlib
@@ -60,10 +35,9 @@ def _ensure_packages():
             subprocess.check_call([sys.executable, "-m", "pip", "install", pkg])
 
 
-# Comment out the next line if you manage deps externally
 _ensure_packages()
 
-# ------------------------------ Imports (post install) ------------------------------
+
 import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin
@@ -82,11 +56,9 @@ from getpass import getpass
 
 warnings.filterwarnings("ignore")
 
-# ============================== Scraper & KB Builder ===============================
 
 class SutherlandWebScraper:
     def __init__(self):
-        # Canonical list of Sutherland Global URLs to scrape
         self.sutherland_urls: List[str] = [
             "https://www.sutherlandglobal.com",
             "https://www.sutherlandglobal.com/about-us",
@@ -217,9 +189,6 @@ class SutherlandWebScraper:
             return vectorstore
         except Exception:
             return None
-
-
-# ============================== RAG Bot (Mistral) ==================================
 
 class SutherlandGeminiRAGBot:
     """Preserve the original class name for compatibility.
@@ -362,8 +331,6 @@ class SutherlandGeminiRAGBot:
             return f"❌ Search error: {e}"
 
 
-# ============================== Streamlit UI =======================================
-
 def _build_or_load_kb() -> Optional[FAISS]:
     """Scrape and build the vector store. Cached by Streamlit to avoid repeats."""
     @st.cache_resource(show_spinner=True)
@@ -432,13 +399,10 @@ def run_streamlit():
             if vectorstore is None:
                 st.error("Knowledge base not ready.")
             else:
-                # Use a transient bot for search convenience
                 api = api_key or os.getenv("MISTRAL_API_KEY", "")
                 bot = SutherlandGeminiRAGBot(vectorstore, api)
                 st.markdown(bot.search_knowledge_base(q))
 
-
-# ============================== CLI Fallback =======================================
 
 def run_cli():
     print("\n🏢 SutherlandBot RAG - Powered by Grok (via Mistral)")
@@ -481,9 +445,6 @@ def run_cli():
         except Exception as e:
             print(f"❌ An error occurred: {e}")
 
-
-# ============================== Entrypoint =========================================
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Sutherland RAG Chatbot")
     parser.add_argument("--cli", action="store_true", help="Run in CLI mode instead of Streamlit")
@@ -492,6 +453,4 @@ if __name__ == "__main__":
     if args.cli:
         run_cli()
     else:
-        # Running via `python` will still start Streamlit layout (useful in some IDEs),
-        # but best is: `streamlit run sutherland_rag_streamlit.py`
         run_streamlit()
