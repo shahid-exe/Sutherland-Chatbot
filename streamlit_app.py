@@ -7,7 +7,6 @@ import warnings
 import argparse
 from typing import List, Optional, Dict, Any
 
-
 def _ensure_packages():
     import importlib
     import subprocess
@@ -34,15 +33,15 @@ def _ensure_packages():
         except Exception:
             subprocess.check_call([sys.executable, "-m", "pip", "install", pkg])
 
-
 _ensure_packages()
-
 
 import requests
 from bs4 import BeautifulSoup
-from urllib.parse import urljoin
 
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+from dotenv import load_dotenv
+load_dotenv()  
+
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import FAISS
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain.schema import Document
@@ -52,10 +51,8 @@ from langchain_core.prompts import PromptTemplate
 from langchain.chains import RetrievalQA
 
 import streamlit as st
-from getpass import getpass
 
 warnings.filterwarnings("ignore")
-
 
 class SutherlandWebScraper:
     def __init__(self):
@@ -190,14 +187,12 @@ class SutherlandWebScraper:
         except Exception:
             return None
 
-class SutherlandGeminiRAGBot:
-    """Preserve the original class name for compatibility.
-    Uses ChatMistralAI underneath; copy labels it as "Grok" per user brief.
-    """
-
-    def __init__(self, vectorstore, api_key: str):
+class SutherlandMistralRAGBot:
+    def __init__(self, vectorstore, api_key: Optional[str] = None):
+        self.api_key = api_key or os.getenv("MISTRAL_API_KEY")
+        if not self.api_key:
+            raise ValueError("❌ No Mistral API key found. Please set MISTRAL_API_KEY in your environment or .env file.")
         self.vectorstore = vectorstore
-        self.api_key = api_key
         self.llm = None
         self.retriever = None
         self.qa_chain = None
@@ -208,7 +203,7 @@ class SutherlandGeminiRAGBot:
         try:
             self.llm = ChatMistralAI(
                 model="open-mistral-7b",
-                temperature=0.3,
+                temperature=0.8,
                 mistral_api_key=self.api_key,
             )
         except Exception as e:
@@ -252,31 +247,11 @@ class SutherlandGeminiRAGBot:
     @staticmethod
     def _is_sutherland_related(question: str) -> bool:
         keywords = [
-            "sutherland",
-            "company",
-            "services",
-            "bpo",
-            "business process",
-            "outsourcing",
-            "founded",
-            "headquarters",
-            "employees",
-            "industries",
-            "clients",
-            "digital transformation",
-            "ai",
-            "automation",
-            "cloud",
-            "analytics",
-            "careers",
-            "jobs",
-            "contact",
-            "about",
-            "global",
-            "offices",
-            "locations",
-            "revenue",
-            "acquisitions",
+            "sutherland", "company", "services", "bpo", "business process",
+            "outsourcing", "founded", "headquarters", "employees", "industries",
+            "clients", "digital transformation", "ai", "automation", "cloud",
+            "analytics", "careers", "jobs", "contact", "about", "global",
+            "offices", "locations", "revenue", "acquisitions",
         ]
         q = question.lower()
         return any(k in q for k in keywords)
@@ -297,23 +272,13 @@ class SutherlandGeminiRAGBot:
             result = self.qa_chain.invoke({"query": question})
             answer = result.get("result", "")
             sources = result.get("source_documents", [])
-
-            dedup = []
-            seen = set()
-            for s in sources[:3]:
-                src = s.metadata.get("source", "Unknown")
-                if src not in seen:
-                    seen.add(src)
-                    dedup.append(src)
-
-            stamp = sources[0].metadata.get("scrape_date", "Unknown") if sources else "Unknown"
-            src_text = "\n".join(f"• {u}" for u in dedup)
-            return (
-                f"{answer}\n\n📚 **Sources from Sutherland's Official Websites:**\n"
-                f"{src_text}\n\n🕒 *Information scraped on: {stamp}*"
-            )
+            if sources:
+                answer += "\n\n**Sources:**\n"
+                for doc in sources[:3]:
+                    answer += f"- {doc.metadata.get('source', 'Unknown')}\n"
+            return answer
         except Exception as e:
-            return f"❌ Error processing your question about Sutherland: {e}"
+            return f"❌ Error processing your question about Sutherland: {str(e)}"
 
     def search_knowledge_base(self, query: str, k: int = 3) -> str:
         if not self.vectorstore:
@@ -330,9 +295,7 @@ class SutherlandGeminiRAGBot:
         except Exception as e:
             return f"❌ Search error: {e}"
 
-
 def _build_or_load_kb() -> Optional[FAISS]:
-    """Scrape and build the vector store. Cached by Streamlit to avoid repeats."""
     @st.cache_resource(show_spinner=True)
     def _inner_build() -> Optional[FAISS]:
         scraper = SutherlandWebScraper()
@@ -340,9 +303,7 @@ def _build_or_load_kb() -> Optional[FAISS]:
         if not ok:
             return None
         return scraper.create_vector_database()
-
     return _inner_build()
-
 
 def run_streamlit():
     st.set_page_config(page_title="SutherlandBot RAG", layout="wide")
@@ -351,7 +312,6 @@ def run_streamlit():
 
     with st.sidebar:
         st.subheader("Setup")
-        api_key = st.text_input("Enter your Mistral API key", type="password")
         if st.button("Initialize / Refresh Knowledge Base"):
             with st.spinner("Scraping Sutherland websites and building vector store..."):
                 vs = _build_or_load_kb()
@@ -367,7 +327,6 @@ def run_streamlit():
     if "messages" not in st.session_state:
         st.session_state.messages = []
 
-    # Display history
     for m in st.session_state.messages:
         with st.chat_message(m["role"]):
             st.markdown(m["content"])
@@ -380,17 +339,14 @@ def run_streamlit():
 
         with st.chat_message("assistant"):
             with st.spinner("SutherlandBot is thinking..."):
-                if not api_key:
-                    st.warning("Please provide your Mistral API key in the sidebar.")
+                vectorstore = _build_or_load_kb()
+                if vectorstore is None:
+                    st.error("Knowledge base is not ready. Click the sidebar button to initialize.")
                 else:
-                    vectorstore = _build_or_load_kb()
-                    if vectorstore is None:
-                        st.error("Knowledge base is not ready. Click the sidebar button to initialize.")
-                    else:
-                        bot = SutherlandGeminiRAGBot(vectorstore, api_key)
-                        answer = bot.ask_question(prompt)
-                        st.markdown(answer)
-                        st.session_state.messages.append({"role": "assistant", "content": answer})
+                    bot = SutherlandMistralRAGBot(vectorstore)
+                    answer = bot.ask_question(prompt)
+                    st.markdown(answer)
+                    st.session_state.messages.append({"role": "assistant", "content": answer})
 
     with st.expander("🔎 Optional: Search knowledge base directly"):
         q = st.text_input("Search query")
@@ -399,16 +355,17 @@ def run_streamlit():
             if vectorstore is None:
                 st.error("Knowledge base not ready.")
             else:
-                api = api_key or os.getenv("MISTRAL_API_KEY", "")
-                bot = SutherlandGeminiRAGBot(vectorstore, api)
+                bot = SutherlandMistralRAGBot(vectorstore)
                 st.markdown(bot.search_knowledge_base(q))
-
 
 def run_cli():
     print("\n🏢 SutherlandBot RAG - Powered by Grok (via Mistral)")
     print("Type 'search: <query>' to search the KB, or 'quit' to exit.\n")
 
-    api_key = os.getenv("MISTRAL_API_KEY") or getpass("Enter your Mistral API key: ")
+    api_key = os.getenv("MISTRAL_API_KEY")
+    if not api_key:
+        print("❌ No API key found. Please set MISTRAL_API_KEY environment variable or .env file.")
+        return
 
     print("Building knowledge base (this may take a moment)...")
     scraper = SutherlandWebScraper()
@@ -420,7 +377,7 @@ def run_cli():
         print("❌ Failed to create vector database")
         return
 
-    bot = SutherlandGeminiRAGBot(vectorstore, api_key)
+    bot = SutherlandMistralRAGBot(vectorstore, api_key)
 
     idx = 1
     while True:
@@ -444,6 +401,7 @@ def run_cli():
             break
         except Exception as e:
             print(f"❌ An error occurred: {e}")
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Sutherland RAG Chatbot")
