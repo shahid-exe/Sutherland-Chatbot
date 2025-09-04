@@ -11,14 +11,13 @@ A simple Streamlit app that shows a chatbot personlaised for Sutherland using Mi
    $ pip install -r requirements.txt
    ```
 
-2. Run the app
-
-   ```
-   $ streamlit run streamlit_app.py
-   ```
-
-3. Use correct API key
+2. Use correct API key
 
    ```
    Go to .env file for information about the API key.
+   ```
+3. Run the app
+
+   ```
+   $ streamlit run streamlit_app.py
    ```
