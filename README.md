@@ -16,8 +16,9 @@ A simple Streamlit app that shows a chatbot personlaised for Sutherland using Mi
    ```
    $ streamlit run streamlit_app.py
    ```
+
 3. Use correct API key
 
    ```
-  Go to .env file for information about the API key.
+   Go to .env file for information about the API key.
    ```
